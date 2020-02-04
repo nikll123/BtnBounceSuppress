@@ -15,35 +15,38 @@ enum BtnState {  //возможные состояния кнопок
 
 struct Btn {    // структура кнопки
   byte pin = 0;
-  int countState = 0;             // счетчик считываний 
+  int countState = 0;             // счетчик считываний
   int countStateToSwitch = 10;
   BtnState stableState = None;   // текущее устойчивое состояние кнопки
   BtnState prevState = None;     // предыдущее считаное состояние кнопки
 
-  void init(byte btnpin) {    // функция для инициализации (установки исходного рабочего состояния) кнопки (типа как конструктор у класса)
+  //-------------------------- функция для инициализации (установки исходного рабочего состояния) кнопки (типа как конструктор у класса)
+  void init(byte btnpin) {    
     pin = btnpin;
     pinMode(pin, INPUT_PULLUP);
   }
 
+  //---------------------------- Функция Check возвращает одно из состояний Pressed, Released, Front, Fall.
   BtnState check() {
-    BtnState newState;    // считанное новое состояние кнопки
+    BtnState instantState;    // состояние кнопки на текущий момент
     if (digitalRead(pin))   // читаем пин
-      newState = Released;  // кнопка отпущена (возможно дребезжит)
+      instantState = Released;  // кнопка отпущена (возможно дребезжит)
     else
-      newState = Pressed;   // кнопка нажата (возможно дребезжит)
+      instantState = Pressed;   // кнопка нажата (возможно дребезжит)
 
-    // условно стабильные состояния кнопки в котором она не может находиться более одного цикла проверки
-    if (stableState == Front)     // если пришел Front - то он обязан смениться на Pressed
+    // Front и Fall - переходные состояния в котором кнопка может находиться только один цикл проверки
+    // после чего состояние безусловно меняется на Pressed или Released соответственно.
+    if (stableState == Front)
       stableState = Pressed;
-    else if (stableState == Fall) // если пришел Fall - то он обязан смениться на Released
+    else if (stableState == Fall)
       stableState = Released;
 
-    if (newState != prevState)  // если изменилось состояние то
+    if (instantState != prevState)  // если изменилось состояние то
       countState = 0;           // обнуляем счетчик и начинаем новый отсчет
     else {
       countState++;             // если состояние не меняется то инкрементим счетчик
-      if (countState == countStateToSwitch && stableState != newState) {  // если насчитали нужное количество одиноковых считываний то меняем стабильное состояние 
-        if (newState == Pressed)     // переход из одного стабильного состояния в другое происходит через состояния Front или Fall
+      if (countState == countStateToSwitch && stableState != instantState) {  // если насчитали нужное количество одиноковых считываний то меняем стабильное состояние
+        if (instantState == Pressed)     // переход из одного стабильного состояния в другое происходит через состояния Front или Fall
           stableState = Front;
         else
           stableState = Fall;
@@ -52,8 +55,8 @@ struct Btn {    // структура кнопки
         countState--;                             // декризим счетчик чтобы он не переполнился.
       }
     }
-    
-    prevState = newState;
+
+    prevState = instantState;
     return stableState;                           // Всегда возвращаем  стабильное (отфильтрованное от дребезга) состояние
   }
 };
@@ -67,7 +70,7 @@ void setup() {
 }
 
 void loop() {
-  BtnState bs = btnRight.check();   // получаем стабильное состояние 
+  BtnState bs = btnRight.check();   // получаем стабильное состояние
   if (bs == Front || bs == Fall) {  // приход фронта и спада обозначаем миганием светодиода
     byte pause = 50 + 50 * (bs == Fall);
     for (int i = 0; i < 6; i++)
@@ -77,7 +80,7 @@ void loop() {
     }
   }
   else
-    digitalWrite( LED_BUILTIN, (bs == Pressed));   устойчивые стосояния нажатия и отпускания соответсвенно показываем светодиодом
+    digitalWrite( LED_BUILTIN, (bs == Pressed));  // устойчивые стосояния нажатия и отпускания соответсвенно показываем светодиодом
 
   Serial.print(bs);
   Serial.print(" ");
